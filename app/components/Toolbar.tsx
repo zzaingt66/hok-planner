@@ -36,44 +36,42 @@ export default function Toolbar() {
         const Icon = t.icon;
         const isActive = tool === t.id;
         return (
-          <button key={t.id} onClick={() => setTool(t.id)} title={`${t.label} (${t.shortcut})`}
-            className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all
-              ${isActive ? "text-zinc-950 shadow-lg" : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"}`}
-            style={isActive ? { background: `linear-gradient(229deg, ${GOLD} 17.3%, ${GOLD_LIGHT} 83.26%)` } : {}}>
-            <Icon size={16} />
-          </button>
+          <div key={t.id} className="flex flex-col items-center">
+            <button onClick={() => setTool(t.id)} title={`${t.label} (${t.shortcut})`}
+              className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all
+                ${isActive ? "text-zinc-950 shadow-lg" : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"}`}
+              style={isActive ? { background: `linear-gradient(229deg, ${GOLD} 17.3%, ${GOLD_LIGHT} 83.26%)` } : {}}>
+              <Icon size={16} />
+            </button>
+            {t.id === "eraser" && tool === "eraser" && (
+              <div className="flex flex-col gap-1 mt-1">
+                {([
+                  { id: "single" as EraserMode, icon: MousePointer, label: "Single erase" },
+                  { id: "box" as EraserMode, icon: Square, label: "Box erase" },
+                ]).map((em) => (
+                  <button key={em.id} onClick={() => setEraserMode(em.id)} title={em.label}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all
+                      ${eraserMode === em.id ? "text-zinc-950" : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"}`}
+                    style={eraserMode === em.id ? { background: `linear-gradient(229deg, ${GOLD} 17.3%, ${GOLD_LIGHT} 83.26%)` } : {}}>
+                    <em.icon size={14} />
+                  </button>
+                ))}
+              </div>
+            )}
+            {t.id === "icon" && tool === "icon" && (
+              <div className="flex flex-col gap-1 mt-1">
+                {iconOptions.map((io) => (
+                  <button key={io.id} onClick={() => setSelectedIcon(io.id)} title={io.label}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all p-0.5
+                      ${selectedIcon === io.id ? "ring-2 ring-amber-500" : "hover:bg-zinc-800"}`}>
+                    <Image src={io.img} alt={io.label} width={28} height={28} className="object-contain brightness-0 invert" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         );
       })}
-
-      {/* Icon sub-picker */}
-      {tool === "icon" && (
-        <div className="flex flex-col gap-1 mt-1">
-          {iconOptions.map((io) => (
-            <button key={io.id} onClick={() => setSelectedIcon(io.id)} title={io.label}
-              className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all p-0.5
-                ${selectedIcon === io.id ? "ring-2 ring-amber-500" : "hover:bg-zinc-800"}`}>
-              <Image src={io.img} alt={io.label} width={28} height={28} className="object-contain brightness-0 invert" />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Eraser mode sub-picker */}
-      {tool === "eraser" && (
-        <div className="flex flex-col gap-1 mt-1">
-          {([
-            { id: "single" as EraserMode, icon: MousePointer, label: "Single erase" },
-            { id: "box" as EraserMode, icon: Square, label: "Box erase" },
-          ]).map((em) => (
-            <button key={em.id} onClick={() => setEraserMode(em.id)} title={em.label}
-              className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all
-                ${eraserMode === em.id ? "text-zinc-950" : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"}`}
-              style={eraserMode === em.id ? { background: `linear-gradient(229deg, ${GOLD} 17.3%, ${GOLD_LIGHT} 83.26%)` } : {}}>
-              <em.icon size={14} />
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="w-6 h-px bg-zinc-800 my-2" />
 
