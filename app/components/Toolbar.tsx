@@ -4,8 +4,9 @@ import { useMapStore } from "../hooks/useMapStore";
 import {
   MousePointer2, Pencil, ArrowUpRight, Circle, Type,
   Eraser, Undo2, Redo2, HelpCircle, Swords, Shield, RotateCcw, StickyNote,
+  MousePointer, Square,
 } from "lucide-react";
-import { Tool, IconName } from "../types";
+import { Tool, IconName, EraserMode } from "../types";
 import Image from "next/image";
 
 const tools: { id: Tool; icon: any; label: string; shortcut: string }[] = [
@@ -27,7 +28,7 @@ const GOLD = "#c09440";
 const GOLD_LIGHT = "#e3c070";
 
 export default function Toolbar() {
-  const { tool, team, color, strokeWidth, selectedIcon, setTool, setTeam, setColor, setStrokeWidth, setSelectedIcon } = useMapStore();
+  const { tool, team, color, strokeWidth, selectedIcon, eraserMode, setTool, setTeam, setColor, setStrokeWidth, setSelectedIcon, setEraserMode } = useMapStore();
 
   return (
     <div className="w-12 bg-zinc-950 border-r border-zinc-800 flex flex-col items-center py-2 gap-1 shrink-0">
@@ -52,6 +53,23 @@ export default function Toolbar() {
               className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all p-0.5
                 ${selectedIcon === io.id ? "ring-2 ring-amber-500" : "hover:bg-zinc-800"}`}>
               <Image src={io.img} alt={io.label} width={28} height={28} className="object-contain brightness-0 invert" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Eraser mode sub-picker */}
+      {tool === "eraser" && (
+        <div className="flex flex-col gap-1 mt-1">
+          {([
+            { id: "single" as EraserMode, icon: MousePointer, label: "Single erase" },
+            { id: "box" as EraserMode, icon: Square, label: "Box erase" },
+          ]).map((em) => (
+            <button key={em.id} onClick={() => setEraserMode(em.id)} title={em.label}
+              className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all
+                ${eraserMode === em.id ? "text-zinc-950" : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"}`}
+              style={eraserMode === em.id ? { background: `linear-gradient(229deg, ${GOLD} 17.3%, ${GOLD_LIGHT} 83.26%)` } : {}}>
+              <em.icon size={14} />
             </button>
           ))}
         </div>

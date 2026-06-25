@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   Tool,
   Team,
+  EraserMode,
   DrawPath,
   DrawCircle,
   DrawText,
@@ -25,6 +26,7 @@ interface MapState {
   fontSize: number;
   selectedId: string | null;
   selectedIcon: IconName;
+  eraserMode: EraserMode;
   lanePoints: LanePoint[];
   paths: DrawPath[];
   circles: DrawCircle[];
@@ -42,6 +44,7 @@ interface MapState {
   setStrokeWidth: (w: number) => void;
   setSelectedId: (id: string | null) => void;
   setSelectedIcon: (icon: IconName) => void;
+  setEraserMode: (mode: EraserMode) => void;
 
   moveLanePoint: (id: string, x: number, y: number) => void;
 
@@ -58,6 +61,7 @@ interface MapState {
   addIcon: (icon: MapIcon) => void;
   moveIcon: (id: string, x: number, y: number) => void;
   removeIcon: (id: string) => void;
+  removeMultiple: (ids: string[]) => void;
 
   setDrawingPoints: (points: number[]) => void;
   setIsDrawing: (drawing: boolean) => void;
@@ -94,6 +98,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   fontSize: 14,
   selectedId: null,
   selectedIcon: "swords" as IconName,
+  eraserMode: "single",
   lanePoints: [...defaultLanePoints],
   paths: [],
   circles: [],
@@ -116,6 +121,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   setStrokeWidth: (w) => set({ strokeWidth: w }),
   setSelectedId: (id) => set({ selectedId: id }),
   setSelectedIcon: (icon) => set({ selectedIcon: icon }),
+  setEraserMode: (mode) => set({ eraserMode: mode }),
 
   moveLanePoint: (id, x, y) => {
     const state = get();
@@ -174,6 +180,19 @@ export const useMapStore = create<MapState>((set, get) => ({
     const state = get();
     set({
       icons: state.icons.filter((ic) => ic.id !== id),
+      history: [...state.history.slice(0, state.historyIndex + 1), pickState(state)],
+      historyIndex: state.historyIndex + 1,
+    });
+  },
+
+  removeMultiple: (ids) => {
+    const idSet = new Set(ids);
+    const state = get();
+    set({
+      paths: state.paths.filter((p) => !idSet.has(p.id)),
+      circles: state.circles.filter((c) => !idSet.has(c.id)),
+      texts: state.texts.filter((t) => !idSet.has(t.id)),
+      icons: state.icons.filter((ic) => !idSet.has(ic.id)),
       history: [...state.history.slice(0, state.historyIndex + 1), pickState(state)],
       historyIndex: state.historyIndex + 1,
     });

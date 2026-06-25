@@ -2,6 +2,8 @@ export type Team = "blue" | "red";
 
 export type Tool = "select" | "pencil" | "arrow" | "circle" | "text" | "eraser" | "icon";
 
+export type EraserMode = "single" | "box";
+
 export type IconName = "swords" | "defence";
 
 export interface LanePoint {

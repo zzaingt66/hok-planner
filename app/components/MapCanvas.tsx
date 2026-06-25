@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
-import { Stage, Layer, Image as KonvaImage, Line, Circle, Text, Group } from "react-konva";
+import { Stage, Layer, Image as KonvaImage, Line, Circle, Text, Group, Rect } from "react-konva";
 import { useMapStore } from "../hooks/useMapStore";
 import { generateId } from "../lib/utils";
 import { KonvaEventObject } from "konva/lib/Node";
@@ -22,16 +22,18 @@ export default function MapCanvas() {
   const [imgMeta, setImgMeta] = useState<ImgMeta | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [iconImages, setIconImages] = useState<Record<string, HTMLImageElement>>({});
+  const [boxStart, setBoxStart] = useState<{ x: number; y: number } | null>(null);
+  const [boxEnd, setBoxEnd] = useState<{ x: number; y: number } | null>(null);
 
   const {
-    tool, team, color, strokeWidth, fontSize, selectedId, selectedIcon,
+    tool, team, color, strokeWidth, fontSize, selectedId, selectedIcon, eraserMode,
     lanePoints, paths, circles, texts, icons,
     drawingPoints, isDrawing,
     setSelectedId, moveLanePoint,
     addPath, removePath,
     addCircle, removeCircle,
     addText, updateText, removeText,
-    addIcon, moveIcon, removeIcon,
+    addIcon, moveIcon, removeIcon, removeMultiple,
     setDrawingPoints, setIsDrawing,
   } = useMapStore();
 
@@ -151,6 +153,13 @@ export default function MapCanvas() {
 
   const handleMouseDown = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
+      if (tool === "eraser" && eraserMode === "box") {
+        const pointer = stageRef.current?.getPointerPosition();
+        if (!pointer) return;
+        setBoxStart(pointer);
+        setBoxEnd(pointer);
+        return;
+      }
       if (tool === "pencil" || tool === "arrow") {
         const pointer = stageRef.current?.getPointerPosition();
         if (!pointer) return;
@@ -158,20 +167,69 @@ export default function MapCanvas() {
         setDrawingPoints([pointer.x, pointer.y]);
       }
     },
-    [tool, setIsDrawing, setDrawingPoints]
+    [tool, eraserMode, setIsDrawing, setDrawingPoints]
   );
 
   const handleMouseMove = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
+      if (tool === "eraser" && eraserMode === "box" && boxStart) {
+        const pointer = stageRef.current?.getPointerPosition();
+        if (!pointer) return;
+        setBoxEnd(pointer);
+        return;
+      }
       if (!isDrawing || (tool !== "pencil" && tool !== "arrow")) return;
       const pointer = stageRef.current?.getPointerPosition();
       if (!pointer) return;
       setDrawingPoints([...drawingPoints, pointer.x, pointer.y]);
     },
-    [isDrawing, tool, drawingPoints, setDrawingPoints]
+    [isDrawing, tool, eraserMode, boxStart, drawingPoints, setDrawingPoints]
   );
 
   const handleMouseUp = useCallback(() => {
+    if (tool === "eraser" && eraserMode === "box" && boxStart && boxEnd) {
+      const x1 = Math.min(boxStart.x, boxEnd.x);
+      const y1 = Math.min(boxStart.y, boxEnd.y);
+      const x2 = Math.max(boxStart.x, boxEnd.x);
+      const y2 = Math.max(boxStart.y, boxEnd.y);
+
+      const idsToRemove: string[] = [];
+
+      paths.forEach((p) => {
+        for (let i = 0; i < p.points.length; i += 2) {
+          const px = display.x + (p.points[i] / 100) * display.w;
+          const py = display.y + (p.points[i + 1] / 100) * display.h;
+          if (px >= x1 && px <= x2 && py >= y1 && py <= y2) {
+            idsToRemove.push(p.id);
+            break;
+          }
+        }
+      });
+
+      circles.forEach((c) => {
+        const px = display.x + (c.x / 100) * display.w;
+        const py = display.y + (c.y / 100) * display.h;
+        if (px >= x1 && px <= x2 && py >= y1 && py <= y2) idsToRemove.push(c.id);
+      });
+
+      texts.forEach((t) => {
+        const px = display.x + (t.x / 100) * display.w;
+        const py = display.y + (t.y / 100) * display.h;
+        if (px >= x1 && px <= x2 && py >= y1 && py <= y2) idsToRemove.push(t.id);
+      });
+
+      icons.forEach((ic) => {
+        const px = display.x + (ic.x / 100) * display.w;
+        const py = display.y + (ic.y / 100) * display.h;
+        if (px >= x1 && px <= x2 && py >= y1 && py <= y2) idsToRemove.push(ic.id);
+      });
+
+      if (idsToRemove.length > 0) removeMultiple(idsToRemove);
+      setBoxStart(null);
+      setBoxEnd(null);
+      return;
+    }
+
     if (!isDrawing || (tool !== "pencil" && tool !== "arrow")) return;
     if (drawingPoints.length >= 4) {
       const normPoints: number[] = [];
@@ -183,7 +241,7 @@ export default function MapCanvas() {
     }
     setIsDrawing(false);
     setDrawingPoints([]);
-  }, [isDrawing, tool, drawingPoints, color, strokeWidth, team, toNorm, addPath, setIsDrawing, setDrawingPoints]);
+  }, [isDrawing, tool, eraserMode, boxStart, boxEnd, drawingPoints, color, strokeWidth, team, toNorm, addPath, setIsDrawing, setDrawingPoints, display, paths, circles, texts, icons, removeMultiple]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -210,7 +268,7 @@ export default function MapCanvas() {
     if (tool === "select") return "default";
     if (tool === "pencil" || tool === "arrow" || tool === "circle" || tool === "icon") return "crosshair";
     if (tool === "text") return "text";
-    if (tool === "eraser") return "not-allowed";
+    if (tool === "eraser") return eraserMode === "box" ? "crosshair" : "pointer";
     return "default";
   };
 
@@ -273,9 +331,16 @@ export default function MapCanvas() {
               return display.y + (v / 100) * display.h;
             });
             return (
-              <Line key={path.id} points={pixelPoints} stroke={path.color} strokeWidth={path.strokeWidth}
-                tension={0.5} lineCap="round" lineJoin="round"
-                onClick={() => tool === "eraser" && removePath(path.id)} />
+              <Group key={path.id}>
+                {tool === "eraser" && eraserMode === "single" && (
+                  <Line points={pixelPoints} stroke="transparent" strokeWidth={Math.max(path.strokeWidth * 3, 16)}
+                    tension={0.5} lineCap="round" lineJoin="round"
+                    onClick={() => removePath(path.id)} />
+                )}
+                <Line points={pixelPoints} stroke={path.color} strokeWidth={path.strokeWidth}
+                  tension={0.5} lineCap="round" lineJoin="round"
+                  onClick={() => tool === "eraser" && removePath(path.id)} />
+              </Group>
             );
           })}
           {isDrawing && drawingPoints.length >= 2 && (
@@ -285,21 +350,50 @@ export default function MapCanvas() {
           )}
           {circles.map((c) => {
             const pos = toPixel(c.x, c.y);
+            const r = (c.radiusX / 100) * display.w;
             return (
-              <Circle key={c.id} x={pos.x} y={pos.y} radius={(c.radiusX / 100) * display.w}
-                stroke={c.color} strokeWidth={c.strokeWidth} fill="transparent"
-                onClick={() => tool === "eraser" && removeCircle(c.id)} />
+              <Group key={c.id}>
+                {tool === "eraser" && eraserMode === "single" && (
+                  <Circle x={pos.x} y={pos.y} radius={Math.max(r + 12, 20)}
+                    fill="transparent"
+                    onClick={() => removeCircle(c.id)} />
+                )}
+                <Circle x={pos.x} y={pos.y} radius={r}
+                  stroke={c.color} strokeWidth={c.strokeWidth} fill="transparent"
+                  onClick={() => tool === "eraser" && removeCircle(c.id)} />
+              </Group>
             );
           })}
           {texts.map((t) => {
             const pos = toPixel(t.x, t.y);
             return (
-              <Text key={t.id} x={pos.x} y={pos.y} text={t.text} fontSize={t.fontSize} fill={t.color}
-                fontStyle="bold" shadowColor="black" shadowBlur={3}
-                onClick={() => { if (tool === "eraser") removeText(t.id); else setSelectedId(t.id); }}
-                onDblClick={() => setEditingTextId(t.id)} />
+              <Group key={t.id}>
+                {tool === "eraser" && eraserMode === "single" && (
+                  <Text x={pos.x - 8} y={pos.y - 4} text={t.text} fontSize={t.fontSize} fill="transparent"
+                    padding={10}
+                    onClick={() => removeText(t.id)} />
+                )}
+                <Text x={pos.x} y={pos.y} text={t.text} fontSize={t.fontSize} fill={t.color}
+                  fontStyle="bold" shadowColor="black" shadowBlur={3}
+                  onClick={() => { if (tool === "eraser") removeText(t.id); else setSelectedId(t.id); }}
+                  onDblClick={() => setEditingTextId(t.id)} />
+              </Group>
             );
           })}
+
+          {/* Box eraser preview */}
+          {tool === "eraser" && eraserMode === "box" && boxStart && boxEnd && (
+            <Rect
+              x={Math.min(boxStart.x, boxEnd.x)}
+              y={Math.min(boxStart.y, boxEnd.y)}
+              width={Math.abs(boxEnd.x - boxStart.x)}
+              height={Math.abs(boxEnd.y - boxStart.y)}
+              fill="rgba(255,255,255,0.08)"
+              stroke="white"
+              strokeWidth={1.5}
+              dash={[6, 4]}
+            />
+          )}
         </Layer>
       </Stage>
 
